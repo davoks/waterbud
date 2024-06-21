@@ -1,4 +1,5 @@
 import serial
+import time 
 import csv
 
 arduino_port = "/dev/cu.usbmodem14301"
@@ -16,18 +17,23 @@ sensor_data = [] #store data
 print("Collecting samples..")
 
 # collect the samples
-dmpReady = False
+dmp_ready = False
+t0 = None
 while line <= nsamples:
-    getData = ser.readline()
-    dataString = getData.decode('utf-8')
+    get_data = ser.readline()
+    timer = time.time()
+    data_string = get_data.decode('utf-8')
+    print(data_string)
 
-    if dmpReady:
-        data = dataString[:-4].split(',')
-        readings = [float(x) for x in data]
+    if dmp_ready:
+        if t0 == None: t0 = timer
+        t = timer - t0
+        data = data_string[:-4].split(',')
+        readings = [t] + [float(x) for x in data]
         print(line,':',readings)
         sensor_data.append(readings)
 
-    if 'DMP' in dataString: dmpReady = True
+    if 'DMP' in data_string: dmp_ready = True
 
     line = line+1
 

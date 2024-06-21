@@ -8,8 +8,7 @@
 
 MPU6050 mpu;
 
-#define OUTPUT_READABLE_QUATERNION_FOR_PYTHON
-//#define OUTPUT_TEAPOT
+#define OUTPUT_ALL
 #define INTERRUPT_PIN 2  // use pin 2 on Arduino Uno & most boards
 #define LED_PIN 13 // (Arduino is 13, Teensy is 11, Teensy++ is 6)
 bool blinkState = false;
@@ -24,8 +23,11 @@ uint8_t fifoBuffer[64]; // FIFO storage buffer
 
 // orientation/motion vars
 Quaternion q;           // [w, x, y, z]         quaternion container
-
-
+VectorInt16 aa;         // [x, y, z]            accel sensor measurements
+VectorInt16 gg;         // [x, y, z]            gyro sensor measurements
+VectorInt16 aaReal;     // [x, y, z]            gravity-free accel sensor measurements
+VectorInt16 aaWorld;    // [x, y, z]            world-frame accel sensor measurements
+VectorFloat gravity;    // [x, y, z]            gravity vector
 
 // ================================================================
 // ===               INTERRUPT DETECTION ROUTINE                ===
@@ -82,11 +84,11 @@ void setup() {
     // Serial.println(F("Initializing DMP..."));
     devStatus = mpu.dmpInitialize();
 
-    // supply your own gyro offsets here, scaled for min sensitivity
-    mpu.setXGyroOffset(220);
-    mpu.setYGyroOffset(76);
-    mpu.setZGyroOffset(-85);
-    mpu.setZAccelOffset(1788); // 1688 factory default for my test chip
+    // supply your own gyro offsets here (computed using IMU_Zero), scaled for min sensitivity
+    mpu.setXGyroOffset(-167);
+    mpu.setYGyroOffset(-15);
+    mpu.setZGyroOffset(-36);
+    mpu.setZAccelOffset(1788); // -151054 is what I get from IMU_Zero and 1688 is Jeff's factory default
 
     // make sure it worked (returns 0 if so)
     if (devStatus == 0) {
@@ -137,30 +139,33 @@ void loop() {
     // read a packet from FIFO
     if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) { // Get the Latest packet
 
-        #ifdef OUTPUT_READABLE_QUATERNION_FOR_PYTHON
-            // display quaternion values in easy matrix form: w x y z
+        #ifdef OUTPUT_ALL
             mpu.dmpGetQuaternion(&q, fifoBuffer);
-            Serial.print(q.w);
-            Serial.print(","); 
-            Serial.print(q.x);
-            Serial.print(",");
-            Serial.print(q.y);
-            Serial.print(",");
-            Serial.println(q.z);
-        #endif
-    
-        #ifdef OUTPUT_TEAPOT
-            // display quaternion values in InvenSense Teapot demo format:
-            teapotPacket[2] = fifoBuffer[0];
-            teapotPacket[3] = fifoBuffer[1];
-            teapotPacket[4] = fifoBuffer[4];
-            teapotPacket[5] = fifoBuffer[5];
-            teapotPacket[6] = fifoBuffer[8];
-            teapotPacket[7] = fifoBuffer[9];
-            teapotPacket[8] = fifoBuffer[12];
-            teapotPacket[9] = fifoBuffer[13];
-            Serial.write(teapotPacket, 14);
-            teapotPacket[11]++; // packetCount, loops at 0xFF on purpose
+            mpu.dmpGetAccel(&aa, fifoBuffer);
+            mpu.dmpGetGravity(&gravity, &q);
+            mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
+            mpu.dmpGetGyro(&gg, fifoBuffer);
+
+            Serial.print(q.w); Serial.print(","); 
+            Serial.print(q.x); Serial.print(",");
+            Serial.print(q.y); Serial.print(",");
+            Serial.print(q.z); Serial.print(",");
+
+            Serial.print(aa.x); Serial.print(","); 
+            Serial.print(aa.y); Serial.print(",");
+            Serial.print(aa.z); Serial.print(",");
+
+            Serial.print(aaReal.x); Serial.print(","); 
+            Serial.print(aaReal.y); Serial.print(",");
+            Serial.print(aaReal.z); Serial.print(",");
+
+            Serial.print(gg.x); Serial.print(",");
+            Serial.print(gg.y); Serial.print(","); 
+            Serial.print(gg.z); Serial.print(",");
+            
+            Serial.print(gravity.x); Serial.print(",");
+            Serial.print(gravity.y); Serial.print(","); 
+            Serial.println(gravity.z);
         #endif
 
         // blink LED to indicate activity
